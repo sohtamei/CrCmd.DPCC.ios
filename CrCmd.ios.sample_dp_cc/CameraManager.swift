@@ -4,24 +4,13 @@ import CoreGraphics
 
 final class CameraManager: NSObject {
 
-    struct Param {
-        var pcode: UInt16 = 0
-        var datatype: UInt16 = 0
-        var getset: UInt8 = 0        // 0-R, 1-R/W
-        var isenabled: UInt8 = 0     // 0-invalid, 1-R/W, 2-R
-        var current: Int32 = 0
-        var formflag: UInt8 = 0
-        var enums: [Int32] = []
-        var enumNum: Int = 0
-
-        var currentIndex: Int = 0
-    }
 
     var paramTable: [Param] = []
 
     var onCameraNameChanged: ((String) -> Void)?
     var onStatusChanged: ((String) -> Void)?
     var onLog: ((String) -> Void)?
+    var onDpUpdated: (() -> Void)?
 
     private let browser = ICDeviceBrowser()
     private var camera: ICCameraDevice?
@@ -201,7 +190,7 @@ final class CameraManager: NSObject {
                 let pcode = PTPParser.readUInt16LE(inData, offset: dp)
                 dp += 2
 
-                let datatype = PTPParser.readUInt16LE(inData, offset: dp)
+                let datatype = PTP_DT(rawValue: PTPParser.readUInt16LE(inData, offset: dp)) ?? .UNDEF
                 dp += 2
 
                 guard dp < recvSize else { break }
@@ -315,14 +304,10 @@ final class CameraManager: NSObject {
             */
             }
         }
+        onDpUpdated?()
     }
 
     func getDP(_ dpCode: UInt16) -> Param? {
-        let dp_enum = DPC(rawValue: dpCode) ?? .UNDEF
-        if dp_enum == DPC.UNDEF {
-            return nil
-        }
-        
         for i in 0..<paramTable.count {
             if paramTable[i].pcode == dpCode {
                 return paramTable[i]
@@ -331,54 +316,95 @@ final class CameraManager: NSObject {
         return nil
     }
 
-    private func getVariableVal(_ datatype: UInt16, _ data: Data, _ dp: inout Int) -> Int32 {
-        var val: Int32 = 0
+    func setDP(_ dpCode: UInt16, _ dpVal: Int64) {
+        for i in 0..<paramTable.count {
+            if paramTable[i].pcode == dpCode {
+            	if paramTable[i].isenabled != 1 { return }
 
-        switch PTP_DT(rawValue: UInt16(datatype)) ?? .UNDEF {
-        case PTP_DT.INT8:
+				var outdata: Data
+			    switch paramTable[i].datatype {
+			    case .INT8, .UINT8:
+			        let v = UInt8(truncatingIfNeeded: dpVal)
+			        outdata = Data([v])
+
+			    case .INT16, .UINT16:
+			        let v = UInt16(truncatingIfNeeded: dpVal).littleEndian
+			        outdata = withUnsafeBytes(of: v) { Data($0) }
+
+			    case .INT32, .UINT32:
+			        let v = UInt32(truncatingIfNeeded: dpVal).littleEndian
+			        outdata = withUnsafeBytes(of: v) { Data($0) }
+
+			    case .INT64, .UINT64:
+			        let v = UInt64(truncatingIfNeeded: dpVal).littleEndian
+			        outdata = withUnsafeBytes(of: v) { Data($0) }
+
+				default:
+					return
+			    }
+	            sendCommand(opCode: PTP_OC.SDIO_SetExtDevicePropValue, params: [UInt32(dpCode)], outData: outdata) { result, inData in
+	                guard result else { return }
+	        	}
+            }
+        }
+        return
+    }
+
+    private func getVariableVal(_ datatype: PTP_DT, _ data: Data, _ dp: inout Int) -> Int64 {
+        var val: Int64 = 0
+
+        switch datatype {
+        case .INT8:
             if dp < data.count {
-                val = Int32(Int8(bitPattern: data[dp]))
+                val = Int64(Int8(bitPattern: data[dp]))
                 dp += 1
             }
 
-        case PTP_DT.UINT8:
+        case .UINT8:
             if dp < data.count {
-                val = Int32(data[dp])
+                val = Int64(data[dp])
                 dp += 1
             }
 
-        case PTP_DT.INT16:
+        case .INT16:
             if dp + 1 < data.count {
-                val = Int32(Int16(bitPattern: PTPParser.readUInt16LE(data, offset: dp)))
+                val = Int64(Int16(bitPattern: PTPParser.readUInt16LE(data, offset: dp)))
                 dp += 2
             }
 
-        case PTP_DT.UINT16:
+        case .UINT16:
             if dp + 1 < data.count {
-                val = Int32(PTPParser.readUInt16LE(data, offset: dp))
+                val = Int64(PTPParser.readUInt16LE(data, offset: dp))
                 dp += 2
             }
 
-        case PTP_DT.INT32:
+        case .INT32:
             if dp + 3 < data.count {
-                val = Int32(bitPattern: PTPParser.readUInt32LE(data, offset: dp))
+                val = Int64(Int32(bitPattern: PTPParser.readUInt32LE(data, offset: dp)))
                 dp += 4
             }
 
-        case PTP_DT.UINT32:
+        case .UINT32:
             if dp + 3 < data.count {
-                let u32 = PTPParser.readUInt32LE(data, offset: dp)
-                val = Int32(bitPattern: u32)
+                val = Int64(PTPParser.readUInt32LE(data, offset: dp))
                 dp += 4
             }
 
-        case PTP_DT.INT64:
-            dp += 8
+        case .INT64:
+            if dp + 7 < data.count {
+                let u64 = PTPParser.readUInt64LE(data, offset: dp)
+                val = Int64(bitPattern: u64)
+                dp += 8
+            }
 
-        case PTP_DT.UINT64:
-            dp += 8
+        case .UINT64:
+            if dp + 7 < data.count {
+                let u64 = PTPParser.readUInt64LE(data, offset: dp)
+                val = Int64(bitPattern: u64)
+                dp += 8
+            }
 
-        case PTP_DT.STR:
+        case .STR:
             if dp < data.count {
                 let strLen = Int(data[dp])
                 dp += 1
@@ -556,13 +582,11 @@ extension CameraManager: ICDeviceDelegate, ICCameraDeviceDelegate {
 
         do {
             let parsed = try PTPParser.parseContainer(eventData)
-            let event_enum = PTP_SDIE(rawValue: parsed.code) ?? .UNDEF
-            if event_enum != PTP_SDIE.UNDEF {
-                //log("PTP EVENT PARSED type=0x\(hex16(parsed.type)) code=0x\(hex16(parsed.code)) txid=\(parsed.transactionID) params=[\(parsed.params.map { "0x" + hex32($0) }.joined(separator: ", "))]")
-                log("e-\(hex16(parsed.code)):\(String(describing: event_enum)) [\(parsed.params.map {String($0)}.joined(separator: ","))]")
-                if parsed.code == PTP_SDIE.DevicePropChanged.rawValue {
-                    getAllDP()
-                }
+            guard let event_enum = PTP_SDIE(rawValue: parsed.code) else { return }
+            //log("PTP EVENT PARSED type=0x\(hex16(parsed.type)) code=0x\(hex16(parsed.code)) txid=\(parsed.transactionID) params=[\(parsed.params.map { "0x" + hex32($0) }.joined(separator: ", "))]")
+            log("e-\(hex16(parsed.code)):\(String(describing: event_enum)) [\(parsed.params.map {String($0)}.joined(separator: ","))]")
+            if parsed.code == PTP_SDIE.DevicePropChanged.rawValue {
+                getAllDP()
             }
         } catch {
             log("PTP EVENT PARSE ERROR: \(error)")

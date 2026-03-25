@@ -1,7 +1,21 @@
 // converted from PTPDef.h
 
+struct Param {
+    var pcode: UInt16 = 0
+    var datatype: PTP_DT = .UNDEF
+    var getset: UInt8 = 0        // 0-R, 1-R/W
+    var isenabled: UInt8 = 0     // 0-invalid, 1-R/W, 2-R
+    var current: Int64 = 0
+    var formflag: UInt8 = 0
+    var enums: [Int64] = []
+    var enumNum: Int = 0
+
+    var currentIndex: Int = 0
+}
+
 enum PTP_DT: UInt16 {
     case UNDEF = 0x0000
+
     case INT8 = 0x0001
     case UINT8 = 0x0002
     case INT16 = 0x0003

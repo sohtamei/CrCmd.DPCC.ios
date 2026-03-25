@@ -2,6 +2,29 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var vm = CameraViewModel()
+    @FocusState private var isTextFieldFocused: Bool
+
+    let candidates = [
+		"D20D (Shutter_Speed)",
+		"5007 (F_Number)",
+		"5010 (Exposure_Bias_Compensation)",
+		"D21E (ISO_Sensitivity)",
+		"500E (Exposure_Program_Mode)",
+		"D2C1 (S1_Button)",
+		"D2C2 (S2_Button)",
+/*
+        "0001 (data1)",
+        "0002 (data2)",
+        "0003 (data3)",
+        "0001 (data1)",
+        "0002 (data2)",
+        "0003 (data3)"
+*/
+    ]
+
+    var filteredCandidates: [String] {
+        return candidates
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -21,85 +44,80 @@ struct ContentView: View {
                     }
 
                     HStack(spacing: 12) {
-                    /*
-                        Button("Start Browse") {
-                            vm.startBrowse()
-                        }
-
-                        Button("Stop Browse") {
-                            vm.stopBrowse()
-                        }
-
-                        Button("Open Session") {
-                            vm.openSession()
-                        }
-                        .disabled(!vm.hasCamera)
-                    */
                         Button("connect") {
                             vm.connect()
                         }
                         .disabled(!vm.hasCamera)
                     }
-                    /*
-                    HStack(spacing: 12) {
-                        Button("Close Session") {
-                            vm.closeSession()
-                        }
-                        .disabled(!vm.hasCamera)
-
-                        Button("get all DP") {
-                            vm.getAllDP()
-                        }
-                        .disabled(!vm.hasCamera)
-                    }
-                    */
                 }.frame(maxWidth: .infinity, alignment: .leading)
             }
 
             GroupBox("PTP Commands") {
                 VStack(alignment: .leading, spacing: 12) {
-					/*
-                    HStack(spacing: 12) {
-	                    Button("Send 0x1001") {
-	                        //
+
+                    HStack {
+                        Text("DP 0x")
+			            TextField("0000", text: $vm.dpCodeHex)
+			                .textFieldStyle(RoundedBorderTextFieldStyle())
+			                .textInputAutocapitalization(.characters)
+			                .focused($isTextFieldFocused)
+
+			            if isTextFieldFocused {
+			                VStack(spacing: 0) {
+			                    ForEach(filteredCandidates, id: \.self) { item in
+			                        Button {
+			                            vm.dpCodeHex = item.components(separatedBy: " ").first ?? item
+			                            isTextFieldFocused = false
+
+					                    if vm.canSendCommand {
+					                    	vm.updatedp()
+					                    }
+			                        } label: {
+			                            HStack {
+			                                Text(item)
+			                                    .foregroundColor(.primary)
+			                                Spacer()
+			                            }
+			                            .padding(.horizontal, 12)
+			                            .padding(.vertical, 10)
+			                            .background(Color.white)
+			                        }
+			                        .buttonStyle(.plain)
+
+			                        Divider()
+			                    }
+			                }
+			                .background(Color.white)
+			                .overlay(
+			                    RoundedRectangle(cornerRadius: 8)
+			                        .stroke(Color.gray.opacity(0.3))
+			                )
+			                .cornerRadius(8)
+			            }
+
+                    }
+
+                    HStack {
+	                    Button("set") {
+	                        vm.setdp()
 	                    }
 	                    .disabled(!vm.canSendCommand)
 
-                        Button("Send 0x9201") {
-                            //
-                        }
-                        .disabled(!vm.canSendCommand)
-
-                        Button("Send 0x9202") {
-                            //
-                        }
-                        .disabled(!vm.canSendCommand)
-                    }
-
-                    Divider()
-
-                    Text("Custom Command")
-                        .font(.headline)
-					*/
-
-                    Button("infoDP") {
-                        vm.infodp()
-                        //vm.sendCustomCommand()
-                    }
-                    .disabled(!vm.canSendCommand)
-
-                    HStack {
-                        Text("DP")
-                        TextField("0000", text: $vm.dpCodeHex)
+                        TextField("0000", text: $vm.dpSetVal)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .autocapitalization(.allCharacters)
+                            .textInputAutocapitalization(.characters)
                     }
 
                     HStack {
-                        Text("Params")
-                        TextField("00000001,00000002", text: $vm.dpParams)
+	                    Button("update") {
+	                        vm.updatedp()
+	                    }
+	                    .disabled(!vm.canSendCommand)
+
+						TextField("xx", text: $vm.dpParams, axis: .vertical)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .autocapitalization(.allCharacters)
+						    .lineLimit(10...20)
+                            .textInputAutocapitalization(.characters)
                     }
 
                 }

@@ -109,6 +109,17 @@ struct PTPParser {
         | (UInt32(data[offset + 2]) << 16)
         | (UInt32(data[offset + 3]) << 24)
     }
+
+    static func readUInt64LE(_ data: Data, offset: Int) -> UInt64 {
+        UInt64(data[offset])
+        | (UInt64(data[offset + 1]) << 8)
+        | (UInt64(data[offset + 2]) << 16)
+        | (UInt64(data[offset + 3]) << 24)
+        | (UInt64(data[offset + 4]) << 32)
+        | (UInt64(data[offset + 5]) << 40)
+        | (UInt64(data[offset + 6]) << 48)
+        | (UInt64(data[offset + 7]) << 56)
+    }
 }
 
 extension Data {
