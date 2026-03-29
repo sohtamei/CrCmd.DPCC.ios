@@ -4,8 +4,7 @@ import CoreGraphics
 
 final class CameraManager: NSObject {
 
-
-    var paramTable: [Param] = []
+    var dpParams: [Param] = []
 
     var onCameraNameChanged: ((String) -> Void)?
     var onStatusChanged: ((String) -> Void)?
@@ -161,6 +160,7 @@ final class CameraManager: NSObject {
                             self.sendCommand(opCode: PTP_OC.SDIO_Connect, params: [3,0,0], outData: nil) { [weak self] result, inData in
                                 guard let self else { return }
                                 guard result else { return }
+                                _ = self
                             }
                         }
                     }
@@ -207,28 +207,28 @@ final class CameraManager: NSObject {
                 let current = getVariableVal(datatype, inData, &dp)
 
                 guard dp < recvSize else { break }
-                let formflag = inData[dp]
+                let formflag = Formflag(rawValue: Int(inData[dp])) ?? .None
                 dp += 1
 
-                var index = paramTable.count
+                var index = dpParams.count
 
                 let dp_enum = DPC(rawValue: pcode) ?? .UNDEF
 
                 if dp_enum != DPC.UNDEF {
                     var updated: Bool = false
 
-                    for i in 0..<paramTable.count {
-                        if paramTable[i].pcode == pcode {
+                    for i in 0..<dpParams.count {
+                        if dpParams[i].pcode == pcode {
                             index = i
                             break
                         }
                     }
 
-                    if index == paramTable.count {
+                    if index == dpParams.count {
                         let newParam = Param(pcode: pcode)
-                        paramTable.append(newParam)
+                        dpParams.append(newParam)
                         updated = true
-                    } else if paramTable[index].current != current {
+                    } else if dpParams[index].current != current {
                         updated = true
                     }
 
@@ -238,26 +238,49 @@ final class CameraManager: NSObject {
                         ))
                     }
 
-                    paramTable[index].datatype = datatype
-                    paramTable[index].getset = getset
-                    paramTable[index].isenabled = isenabled
-                    paramTable[index].current = current
-                    paramTable[index].formflag = formflag
-                    paramTable[index].currentIndex = 0
-                    paramTable[index].enumNum = 0
-                    paramTable[index].enums.removeAll()
+                	dpParams[index].modeRW = .Invalid
+                    switch isenabled {		// 0-invalid, 1-R/W, 2-R
+                    case 0:
+						break
+					case 1:
+	                    switch getset {		// 0-R, 1-R/W
+	                    case 0:
+	                    	dpParams[index].modeRW = .R
+	                    case 1:
+	                    	dpParams[index].modeRW = .RW
+						default:
+							break
+						}
+                    case 2:
+                    	dpParams[index].modeRW = .R
+					default:
+						break
+					}
+
+
+                    dpParams[index].datatype = datatype
+                    dpParams[index].current = current
+                    dpParams[index].formflag = formflag
+                    dpParams[index].currentIndex = 0
+                    dpParams[index].enums.removeAll()
                 }
 
                 switch formflag {
-                case 0:
+                case .None:
                     break
 
-                case 1:
-                    _ = getVariableVal(datatype, inData, &dp)
-                    _ = getVariableVal(datatype, inData, &dp)
-                    _ = getVariableVal(datatype, inData, &dp)
+                case .Range:
+                    if dp_enum != DPC.UNDEF {
+                        dpParams[index].enums = Array(repeating: 0, count: 3)
+                    }
+                    for i in 0..<3 {
+                        let data = getVariableVal(datatype, inData, &dp)
+                        if dp_enum != DPC.UNDEF {
+                            dpParams[index].enums[i] = data
+                        }
+                    }
 
-                case 2:
+                case .Enum:
                     var num = PTPParser.readUInt16LE(inData, offset: dp)
                     dp += 2
 
@@ -269,22 +292,18 @@ final class CameraManager: NSObject {
                     dp += 2
 
                     if dp_enum != DPC.UNDEF {
-                        paramTable[index].enumNum = Int(num)
-                        paramTable[index].enums = Array(repeating: 0, count: Int(num))
+                        dpParams[index].enums = Array(repeating: 0, count: Int(num))
                     }
 
                     for i in 0..<Int(num) {
                         let data = getVariableVal(datatype, inData, &dp)
                         if dp_enum != DPC.UNDEF {
-                            paramTable[index].enums[i] = data
+                            dpParams[index].enums[i] = data
                             if data == current {
-                                paramTable[index].currentIndex = i
+                                dpParams[index].currentIndex = i
                             }
                         }
                     }
-
-                default:
-                    log("Control Transfer Timeout")
                 }
             /*
                 if updated {
@@ -296,59 +315,144 @@ final class CameraManager: NSObject {
                             Int(getset),
                             Int(isenabled),
                             Int(formflag),
-                            paramTable[index].currentIndex,
+                            dpParams[index].currentIndex,
                             Int(current)
                         )
                     )
                 }
             */
             }
+	        onDpUpdated?()
         }
-        onDpUpdated?()
     }
 
-    func getDP(_ dpCode: UInt16) -> Param? {
-        for i in 0..<paramTable.count {
-            if paramTable[i].pcode == dpCode {
-                return paramTable[i]
+    func getDPCC(_ pcode: UInt16) -> Param? {
+        for i in 0..<dpParams.count {
+            if dpParams[i].pcode == pcode {
+                return dpParams[i]
+            }
+        }
+
+        for i in 0..<ccParams.count {
+            if ccParams[i].pcode == pcode {
+                return ccParams[i]
             }
         }
         return nil
     }
 
-    func setDP(_ dpCode: UInt16, _ dpVal: Int64) {
-        for i in 0..<paramTable.count {
-            if paramTable[i].pcode == dpCode {
-            	if paramTable[i].isenabled != 1 { return }
+    func setDPCC(_ pcode: UInt16, _ val: Int64) {
+		guard let param = getDPCC(pcode) else { return }
 
-				var outdata: Data
-			    switch paramTable[i].datatype {
-			    case .INT8, .UINT8:
-			        let v = UInt8(truncatingIfNeeded: dpVal)
-			        outdata = Data([v])
+		var outdata: Data
+	    switch param.datatype {
+	    case .INT8, .UINT8:
+	        let v = UInt8(truncatingIfNeeded: val)
+	        outdata = Data([v])
 
-			    case .INT16, .UINT16:
-			        let v = UInt16(truncatingIfNeeded: dpVal).littleEndian
-			        outdata = withUnsafeBytes(of: v) { Data($0) }
+	    case .INT16, .UINT16:
+	        let v = UInt16(truncatingIfNeeded: val).littleEndian
+	        outdata = withUnsafeBytes(of: v) { Data($0) }
 
-			    case .INT32, .UINT32:
-			        let v = UInt32(truncatingIfNeeded: dpVal).littleEndian
-			        outdata = withUnsafeBytes(of: v) { Data($0) }
+	    case .INT32, .UINT32:
+	        let v = UInt32(truncatingIfNeeded: val).littleEndian
+	        outdata = withUnsafeBytes(of: v) { Data($0) }
 
-			    case .INT64, .UINT64:
-			        let v = UInt64(truncatingIfNeeded: dpVal).littleEndian
-			        outdata = withUnsafeBytes(of: v) { Data($0) }
+	    case .INT64, .UINT64:
+	        let v = UInt64(truncatingIfNeeded: val).littleEndian
+	        outdata = withUnsafeBytes(of: v) { Data($0) }
 
-				default:
-					return
-			    }
-	            sendCommand(opCode: PTP_OC.SDIO_SetExtDevicePropValue, params: [UInt32(dpCode)], outData: outdata) { result, inData in
-	                guard result else { return }
-	        	}
-            }
-        }
+		default:
+			return
+	    }
+
+		if !param.cc_dp {
+        	if param.modeRW != .RW { return }
+            sendCommand(opCode: PTP_OC.SDIO_SetExtDevicePropValue, params: [UInt32(pcode),1], outData: outdata) { result, inData in
+                guard result else { return }
+        	}
+		} else {
+            sendCommand(opCode: PTP_OC.SDIO_ControlDevice, params: [UInt32(pcode),1], outData: outdata) { result, inData in
+                guard result else { return }
+        	}
+		}
         return
     }
+
+    func setDP(_ pcode: UInt16, _ type: TypeIncDec) {
+		guard let param = getDPCC(pcode) else { return }
+		if param.cc_dp { return }
+
+		var val: Int64
+		switch param.formflag {
+		case .Range:
+			if param.enums.count != 3 { return }
+
+			val = param.current
+			switch type {
+			case .Inc:
+				if val >= param.enums[1] { return }
+				val += param.enums[2]
+			case .Dec:
+				if val <= param.enums[0] { return }
+				val -= param.enums[2]
+			case .Max:
+				val = param.enums[1]
+			case .Min:
+				val = param.enums[0]
+			}
+
+		case .Enum:
+			var index = param.currentIndex
+			switch type {
+			case .Inc:
+				if index >= param.enums.count-1 { return }
+				index += 1
+			case .Dec:
+				if index <= 0 { return }
+				index -= 1
+			case .Max:
+				index = param.enums.count-1
+			case .Min:
+				index = 0
+			}
+			val = param.enums[index]
+
+		default:
+			return
+		}
+		setDPCC(pcode, val)
+	}
+
+    func setCC(_ pcode: UInt16, _ val: Int64) {
+		setDPCC(pcode, val)
+	}
+
+	func liveview(completion: ((Bool, Data?) -> Void)?) {
+        self.sendCommand(opCode: PTP_OC.GetObject, params: [0xFFFFC002], outData: nil) { result, inData in		// liveview
+            guard result else {
+            	completion?(false, nil)
+                return
+            }
+            guard let inData else {
+            	completion?(false, nil)
+                return
+            }
+			let lv_offset   = Int(PTPParser.readUInt32LE(inData, offset: 0))
+			let lv_size     = Int(PTPParser.readUInt32LE(inData, offset: 4))
+			//let prop_offset = Int(PTPParser.readUInt32LE(inData, offset: 8))
+			//let prop_size   = Int(PTPParser.readUInt32LE(inData, offset: 12))
+			if lv_offset+lv_size > inData.count {
+            	completion?(false, nil)
+                return
+            }
+
+            let lvData = inData.subdata(in: lv_offset ..< (lv_offset+lv_size))
+            completion?(true, lvData)
+            return
+    	}
+        return
+	}
 
     private func getVariableVal(_ datatype: PTP_DT, _ data: Data, _ dp: inout Int) -> Int64 {
         var val: Int64 = 0

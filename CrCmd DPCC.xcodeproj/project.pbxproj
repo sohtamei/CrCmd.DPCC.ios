@@ -11,7 +11,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		52F4D55E2F6D48D5004F01D3 /* CrCmd.ios.sample_dp_cc.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CrCmd.ios.sample_dp_cc.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		52F4D55E2F6D48D5004F01D3 /* CrCmd DPCC.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "CrCmd DPCC.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		52F4D5772F6D4BB4004F01D3 /* ImageCaptureCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ImageCaptureCore.framework; path = System/Library/Frameworks/ImageCaptureCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
@@ -47,7 +47,7 @@
 		52F4D55F2F6D48D5004F01D3 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				52F4D55E2F6D48D5004F01D3 /* CrCmd.ios.sample_dp_cc.app */,
+				52F4D55E2F6D48D5004F01D3 /* CrCmd DPCC.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -63,9 +63,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		52F4D55D2F6D48D5004F01D3 /* CrCmd.ios.sample_dp_cc */ = {
+		52F4D55D2F6D48D5004F01D3 /* CrCmd DPCC */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 52F4D5692F6D48D7004F01D3 /* Build configuration list for PBXNativeTarget "CrCmd.ios.sample_dp_cc" */;
+			buildConfigurationList = 52F4D5692F6D48D7004F01D3 /* Build configuration list for PBXNativeTarget "CrCmd DPCC" */;
 			buildPhases = (
 				52F4D55A2F6D48D5004F01D3 /* Sources */,
 				52F4D55B2F6D48D5004F01D3 /* Frameworks */,
@@ -78,11 +78,11 @@
 			fileSystemSynchronizedGroups = (
 				52F4D5602F6D48D5004F01D3 /* CrCmd.ios.sample_dp_cc */,
 			);
-			name = CrCmd.ios.sample_dp_cc;
+			name = "CrCmd DPCC";
 			packageProductDependencies = (
 			);
 			productName = CrCmd.ios.sample_dp_cc;
-			productReference = 52F4D55E2F6D48D5004F01D3 /* CrCmd.ios.sample_dp_cc.app */;
+			productReference = 52F4D55E2F6D48D5004F01D3 /* CrCmd DPCC.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -100,7 +100,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 52F4D5592F6D48D5004F01D3 /* Build configuration list for PBXProject "CrCmd.ios.sample_dp_cc" */;
+			buildConfigurationList = 52F4D5592F6D48D5004F01D3 /* Build configuration list for PBXProject "CrCmd DPCC" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -114,7 +114,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				52F4D55D2F6D48D5004F01D3 /* CrCmd.ios.sample_dp_cc */,
+				52F4D55D2F6D48D5004F01D3 /* CrCmd DPCC */,
 			);
 		};
 /* End PBXProject section */
@@ -267,7 +267,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 7BHP77FYD9;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = test;
@@ -281,7 +281,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = jp.co.xx;
+				PRODUCT_BUNDLE_IDENTIFIER = "jp.co.sohtamei.crcmd-dpcc";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -305,7 +305,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 7BHP77FYD9;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = test;
@@ -319,7 +319,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = jp.co.xx;
+				PRODUCT_BUNDLE_IDENTIFIER = "jp.co.sohtamei.crcmd-dpcc";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -338,7 +338,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		52F4D5592F6D48D5004F01D3 /* Build configuration list for PBXProject "CrCmd.ios.sample_dp_cc" */ = {
+		52F4D5592F6D48D5004F01D3 /* Build configuration list for PBXProject "CrCmd DPCC" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				52F4D5672F6D48D7004F01D3 /* Debug */,
@@ -347,7 +347,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		52F4D5692F6D48D7004F01D3 /* Build configuration list for PBXNativeTarget "CrCmd.ios.sample_dp_cc" */ = {
+		52F4D5692F6D48D7004F01D3 /* Build configuration list for PBXNativeTarget "CrCmd DPCC" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				52F4D56A2F6D48D7004F01D3 /* Debug */,

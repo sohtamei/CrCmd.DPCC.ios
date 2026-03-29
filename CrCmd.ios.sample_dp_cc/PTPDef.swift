@@ -2,16 +2,113 @@
 
 struct Param {
     var pcode: UInt16 = 0
+    var cc_dp: Bool = false
     var datatype: PTP_DT = .UNDEF
-    var getset: UInt8 = 0        // 0-R, 1-R/W
-    var isenabled: UInt8 = 0     // 0-invalid, 1-R/W, 2-R
+    var modeRW: ModeRW = .Invalid
     var current: Int64 = 0
-    var formflag: UInt8 = 0
+    var formflag: Formflag = .None
     var enums: [Int64] = []
-    var enumNum: Int = 0
 
     var currentIndex: Int = 0
 }
+
+enum TypeIncDec {
+    case Inc
+    case Dec
+    case Min
+    case Max
+}
+
+enum ModeRW {
+    case Invalid
+    case R
+    case RW
+}
+
+enum Formflag: Int {
+	case None = 0
+	case Range = 1
+	case Enum = 2
+}
+
+enum ModeInput {
+	case Disabled
+	case CC
+	case DP
+}
+
+let ccParams: [Param] = [
+    Param(pcode:0xD2C1, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2C2, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2C3, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2C8, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2C9, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2CD, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2CE, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2CF, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2D0, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2D1, cc_dp:true, datatype:.INT16, formflag:.Range, enums:[-7,7,1]),
+    Param(pcode:0xD2D9, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2DC, cc_dp:true, datatype:.UINT32, formflag:.Range, enums:[0x00000000,0xFFFFFFFF,1]),
+    Param(pcode:0xD2DD, cc_dp:true, datatype:.INT8, formflag:.Range, enums:[-1,1,1]),
+    Param(pcode:0xD2DF, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2E0, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2E1, cc_dp:true, datatype:.UINT32, formflag:.Range, enums:[0x00000000,0xFFFFFFFF,1]),
+    Param(pcode:0xD2E2, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2,0x11,0x12]),
+    Param(pcode:0xD2E3, cc_dp:true, datatype:.INT16, formflag:.Range, enums:[-32768,32767,1]),
+    Param(pcode:0xD2E4, cc_dp:true, datatype:.UINT32, formflag:.Range, enums:[0x00000000,0xFFFFFFFF,1]),
+    Param(pcode:0xD2E5, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2E6, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2E7, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2E9, cc_dp:true, datatype:.UINT8, formflag:.Range, enums:[0x00,0xFF,1]),
+    Param(pcode:0xD2EA, cc_dp:true, datatype:.UINT8, formflag:.Range, enums:[0x00,0xFF,1]),
+    Param(pcode:0xD2EB, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2EC, cc_dp:true, datatype:.INT16, formflag:.Range, enums:[-30,30,1]),
+    Param(pcode:0xD2ED, cc_dp:true, datatype:.INT16, formflag:.Range, enums:[-198,198,1]),
+    Param(pcode:0xD2EE, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2EF, cc_dp:true, datatype:.INT8, formflag:.Range, enums:[-1,1,1]),
+    Param(pcode:0xD2F0, cc_dp:true, datatype:.INT16, formflag:.Range, enums:[-1,1,1]),
+    Param(pcode:0xD2F1, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2F2, cc_dp:true, datatype:.UINT16, formflag:.Range, enums:[]),
+    Param(pcode:0xD2F3, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2F6, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2F7, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2F8, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2F9, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2FA, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2FB, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2FC, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2FD, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2FE, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD2FF, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD300, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD301, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD302, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD303, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD304, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD305, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD306, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD307, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD309, cc_dp:true, datatype:.UINT32, formflag:.Range, enums:[]),
+    Param(pcode:0xD30A, cc_dp:true, datatype:.UINT32, formflag:.Range, enums:[]),
+    Param(pcode:0xD30B, cc_dp:true, datatype:.INT32, formflag:.Range, enums:[]),
+    Param(pcode:0xD30C, cc_dp:true, datatype:.INT32, formflag:.Range, enums:[]),
+    Param(pcode:0xD30D, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD30E, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD312, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD313, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD314, cc_dp:true, datatype:.STR, formflag:.None, enums:[]),
+    Param(pcode:0xD315, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xD316, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xF000, cc_dp:true, datatype:.INT16, formflag:.Range, enums:[-32768,32767,1]),
+    Param(pcode:0xF001, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xF002, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xF003, cc_dp:true, datatype:.INT16, formflag:.Range, enums:[-32767,32767,1]),
+    Param(pcode:0xF004, cc_dp:true, datatype:.INT16, formflag:.Range, enums:[-32767,32767,1]),
+    Param(pcode:0xF00C, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1,2]),
+    Param(pcode:0xF012, cc_dp:true, datatype:.UINT16, formflag:.Enum, enums:[1]),
+    Param(pcode:0xF015, cc_dp:true, datatype:.UINT16, formflag:.Range, enums:[0x0000,0xFFFF,1]),
+]
 
 enum PTP_DT: UInt16 {
     case UNDEF = 0x0000
@@ -218,8 +315,6 @@ enum PTP_CC: UInt16 {
     case Cancel_Zoom_Position = 0xF00C
     case USB_Connection_Mode_Request = 0xF012
     case Preset_PTZF_Recall = 0xF015
-    case StoreAdded = 0x4004
-    case StoreRemoved = 0x4005
 }
 
 enum DPC: UInt16 {

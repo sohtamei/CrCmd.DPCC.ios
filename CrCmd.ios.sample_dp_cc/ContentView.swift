@@ -12,66 +12,96 @@ struct ContentView: View {
 		"500E (Exposure_Program_Mode)",
 		"D2C1 (S1_Button)",
 		"D2C2 (S2_Button)",
-/*
-        "0001 (data1)",
-        "0002 (data2)",
-        "0003 (data3)",
-        "0001 (data1)",
-        "0002 (data2)",
-        "0003 (data3)"
-*/
     ]
 
-    var filteredCandidates: [String] {
-        return candidates
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 8) {
 
-            GroupBox("Camera") {
+            GroupBox("Camera - DP,CC") {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("Status:")
-                            .font(.headline)
-                        Text(vm.cameraStatusText)
+				        VStack(alignment: .leading) {
+		                    HStack {
+								Button {
+								    vm.connect()
+								} label: {
+								    Text("connect")
+								        .foregroundColor(
+								        	!vm.hasCamera ? .gray :
+								        	vm.isConnected ? .white : .primary)
+								        .frame(width: 80, height: 32)
+								        .background(
+								            Capsule()
+								                .fill(vm.isConnected ? Color.blue : Color(.systemBackground))
+								        )
+								}.disabled(!vm.hasCamera)
+
+		                        if vm.cameraName.isEmpty {
+		                        	Text("(none)")
+		                        } else {
+			                        Text(vm.cameraName + " - " + vm.cameraStatusText)
+		                        }
+							}
+
+		                    HStack {
+		                        Button {
+		                            vm.liveview()
+								} label: {
+								    Text("LiveView")
+								        .foregroundColor(
+								        	!vm.canSendCommand ? .gray :
+								        	vm.isLiveview ? .white : .primary)
+								        .frame(width: 80, height: 32)
+								        .background(
+								            Capsule()
+								                .fill(vm.isLiveview ? Color.blue : Color(.systemBackground))
+								        )
+		                        }.disabled(!vm.canSendCommand)
+
+		                        Button("listcc") {
+		                            //vm.listcc()
+		                        }
+			                    .disabled(!vm.canSendCommand)
+		                    }
+						} // VStack
+					    Spacer()
+
+						if let uiImage = UIImage(data: vm.jpegData) {
+						    Image(uiImage: uiImage)
+						        .resizable()
+						        .scaledToFit()
+						        .frame(width: 160, height: 90)
+						}
                     }
 
-                    HStack {
-                        Text("Device:")
-                            .font(.headline)
-                        Text(vm.cameraName.isEmpty ? "(none)" : vm.cameraName)
-                    }
-
-                    HStack(spacing: 12) {
-                        Button("connect") {
-                            vm.connect()
-                        }
-                        .disabled(!vm.hasCamera)
-                    }
-                }.frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            GroupBox("PTP Commands") {
-                VStack(alignment: .leading, spacing: 12) {
-
-                    HStack {
-                        Text("DP 0x")
-			            TextField("0000", text: $vm.dpCodeHex)
-			                .textFieldStyle(RoundedBorderTextFieldStyle())
-			                .textInputAutocapitalization(.characters)
-			                .focused($isTextFieldFocused)
+                    HStack(alignment: .top) {
+                    	HStack {
+	                        Text("code 0x")
+				            TextField("0000", text: $vm.codeHex)
+				                .textFieldStyle(.roundedBorder)
+				                .focused($isTextFieldFocused)
+				                .frame(width: 80)
+					            .onSubmit {
+			                    	vm.updateDPCC()
+					            }
+					            .onChange(of: isTextFieldFocused) { focused in
+					                if !focused {
+					                    if vm.canSendCommand {
+					                    	vm.updateDPCC()
+					                    }
+					                }
+					            }
+				        	if !isTextFieldFocused {
+				            	Text(vm.describingDPCC(vm.codeHex))
+		            		}
+						}
 
 			            if isTextFieldFocused {
 			                VStack(spacing: 0) {
-			                    ForEach(filteredCandidates, id: \.self) { item in
+			                    ForEach(candidates, id: \.self) { item in
 			                        Button {
-			                            vm.dpCodeHex = item.components(separatedBy: " ").first ?? item
+			                            vm.codeHex = item.components(separatedBy: " ").first ?? item
 			                            isTextFieldFocused = false
-
-					                    if vm.canSendCommand {
-					                    	vm.updatedp()
-					                    }
 			                        } label: {
 			                            HStack {
 			                                Text(item)
@@ -87,41 +117,38 @@ struct ContentView: View {
 			                        Divider()
 			                    }
 			                }
-			                .background(Color.white)
-			                .overlay(
-			                    RoundedRectangle(cornerRadius: 8)
-			                        .stroke(Color.gray.opacity(0.3))
-			                )
-			                .cornerRadius(8)
 			            }
-
                     }
 
                     HStack {
-	                    Button("set") {
-	                        vm.setdp()
-	                    }
-	                    .disabled(!vm.canSendCommand)
+						TextField("", text: $vm.dpParams, axis: .vertical)
+			                .textFieldStyle(.roundedBorder)
+						    .lineLimit(5...20)
+					}
+					if vm.canSendCommand && (vm.modeInput != .Disabled) {
+	                    HStack {
+							if vm.modeInput == .DP {
+			                    Button("min") { vm.setDP(.Min) }
+			                    Button("dec") { vm.setDP(.Dec) }
+			                    Button("inc") { vm.setDP(.Inc) }
+			                    Button("max") { vm.setDP(.Max) }
+							} else {
+			                    Button("set(1)") { vm.setCC(1) }
+			                    Button("set(2)") { vm.setCC(2) }
+							}
+	                        Text(" ")
 
-                        TextField("0000", text: $vm.dpSetVal)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .textInputAutocapitalization(.characters)
+	                        TextField("0000", text: $vm.dpSetVal)
+				                .textFieldStyle(.roundedBorder)
+				                .frame(width: 100)
+				                .onSubmit {
+				                	vm.setDPCC()
+				            	}
+		                    Button("set") { vm.setDPCC() }
+						}
                     }
-
-                    HStack {
-	                    Button("update") {
-	                        vm.updatedp()
-	                    }
-	                    .disabled(!vm.canSendCommand)
-
-						TextField("xx", text: $vm.dpParams, axis: .vertical)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-						    .lineLimit(10...20)
-                            .textInputAutocapitalization(.characters)
-                    }
-
-                }
-            }
+                } // VStack
+            } // GroupBox
 
             GroupBox("Log") {
                 ScrollViewReader { proxy in
@@ -144,8 +171,8 @@ struct ContentView: View {
                 }
             }
             .frame(maxHeight: .infinity)
-        }
-    }
+        } // VStack
+    } // body
 }
 
 #Preview {

@@ -1,14 +1,24 @@
 import Foundation
 import Combine
+import SwiftUI
+import UIKit
 
 final class CameraViewModel: ObservableObject {
 
+	@Published var isConnected = false
+	@Published var isLiveview = false
+
     @Published var cameraName: String = ""
     @Published var cameraStatusText: String = "idle"
+    @Published var jpegData: Data = Data()
+
+    @Published var codeHex: String = "5007"
+
+    @Published var dpParams: String = ""
+    @Published var modeInput: ModeInput = .Disabled
+    @Published var dpSetVal: String = "0"
+
     @Published var logText: String = ""
-    @Published var dpCodeHex: String = "5007"
-    @Published var dpSetVal: String = "0x00"
-    @Published var dpParams: String = "xx"
 
     private let manager = CameraManager()
 
@@ -46,7 +56,7 @@ final class CameraViewModel: ObservableObject {
         }
 
         manager.onDpUpdated = { [weak self] in
-            self?.updatedp()
+            self?.updateDPCC()
         }
     }
 
@@ -64,60 +74,83 @@ final class CameraViewModel: ObservableObject {
 
     func connect() {
         manager.connectSequence()
+		isConnected = true
     }
 
     func closeSession() {
         manager.closeSession()
     }
 
-    func updatedp() {
-        guard let dpCode = UInt16(dpCodeHex, radix: 16) else { return }
+	func updateDPCC_work() -> String? {
+        var text = ""
 
-        guard let dp_enum = DPC(rawValue: dpCode) else { return }
+        guard let pcode = UInt16(codeHex, radix: 16) else { return nil }
+        guard let param = manager.getDPCC(pcode) else { return nil }
+		var _modeInput: ModeInput = .Disabled
 
-        guard let dp_param = manager.getDP(dpCode) else { return }
-
-        var text = String(describing: dp_enum) + "\n"
-                 + "datatype=" + String(describing: dp_param.datatype) + "\n"
-        if dp_param.datatype == PTP_DT.STR {
+        if param.cc_dp {
+	        text = String(describing: param.formflag) + "="
+                + param.enums.map {String($0)}.joined(separator: ",")
+	    	_modeInput = .CC
+		} else if param.datatype == PTP_DT.STR {
+        	text = "mode=" + String(describing: param.modeRW)
         } else {
-        	text += "current=" + String(dp_param.current) + "\n"
-        			 +  "getset=" + String(dp_param.getset) + "\n"
-        			 +  "isenabled=" + String(dp_param.isenabled) + "\n"
-        			 +  "formflag=" + String(dp_param.formflag) + "\n"
-                	 +  "enums=" + dp_param.enums.map {String($0)}.joined(separator: ",") //+ "\n"
+        	text = "current=" + String(param.current) + String(format: "(0x%X)\n", param.current)
+        		+ "mode=" + String(describing: param.modeRW) + "\n"
+        		+ String(describing: param.formflag) + "="
+                + param.enums.map {String($0)}.joined(separator: ",")
+			if param.modeRW == .RW { _modeInput = .DP }
         }
-		//appendLocalLog(dpParams + "\n")
+    	DispatchQueue.main.async { self.modeInput = _modeInput }
+		return text
+	}
 
-    	DispatchQueue.main.async {
-			self.dpParams = text
-		}
+    func updateDPCC() {
+		guard let text = updateDPCC_work() else { return }
+    	DispatchQueue.main.async { self.dpParams = text }
     }
 
-    func setdp() {
-        guard let dpCode = UInt16(dpCodeHex, radix: 16) else { return }
+    func setDPCC() {
+        guard let pcode = UInt16(codeHex, radix: 16) else { return }
 
 	    if dpSetVal.hasPrefix("0x") || dpSetVal.hasPrefix("0X") {
 			guard let setVal = Int64(String(dpSetVal.dropFirst(2)), radix: 16) else {return}
-		    manager.setDP(dpCode, setVal)
+		    manager.setDPCC(pcode, setVal)
 	    } else {
 			guard let setVal = Int64(dpSetVal) else {return}
-		    manager.setDP(dpCode, setVal)
+		    manager.setDPCC(pcode, setVal)
 	    }
     }
 
-    private func parseParams(_ text: String) -> [UInt32] {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty {
-            return []
-        }
+    func setDP(_ type: TypeIncDec) {
+        guard let pcode = UInt16(codeHex, radix: 16) else { return }
+	    manager.setDP(pcode, type)
+    }
 
-        return trimmed
-            .split(separator: ",")
-            .compactMap { part in
-                let s = part.trimmingCharacters(in: .whitespacesAndNewlines)
-                return UInt32(s, radix: 16)
-            }
+    func setCC(_ val: Int64) {
+        guard let pcode = UInt16(codeHex, radix: 16) else { return }
+	    manager.setCC(pcode, val)
+    }
+
+    func describingDPCC(_ codeStr: String) -> String {
+		guard let pcode = UInt16(codeStr, radix: 16) else { return "(unknown)" }
+
+		guard let dp_enum = DPC(rawValue: pcode) else {
+			guard let cc_enum = PTP_CC(rawValue: pcode) else { return "(unknown)" }
+			return String(describing: cc_enum)
+		}
+		return String(describing: dp_enum)
+    }
+
+    func liveview() {
+		manager.liveview() { result, lvData in
+			if result {
+				guard let lvData else { return }
+		    	DispatchQueue.main.async { self.jpegData = lvData }
+			}
+			return
+		}
+		isLiveview = true
     }
 
     private func appendLocalLog(_ message: String) {
