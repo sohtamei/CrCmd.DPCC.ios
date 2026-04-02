@@ -4,8 +4,6 @@ import CoreGraphics
 
 final class CameraManager: NSObject {
 
-    var dpParams: [Param] = []
-
     var onCameraNameChanged: ((String) -> Void)?
     var onStatusChanged: ((String) -> Void)?
     var onLog: ((String) -> Void)?
@@ -14,65 +12,61 @@ final class CameraManager: NSObject {
     private let browser = ICDeviceBrowser()
     private var camera: ICCameraDevice?
 
-    private(set) var isSessionOpen: Bool = false
-    private var nextTransactionID: UInt32 = 1
+    private var cameraStatus: String = ""
+    private var dpParams: [Param] = []
+    private var ccList: Data = Data()
 
-    private var pendingOpenSessionCompletion: ((Bool) -> Void)?
-
-    var hasCamera: Bool {
-        camera != nil
-    }
+    private var PTPOperation_cb: ((Bool) -> Void)?
+    private var PTPOperation_timeout: DispatchWorkItem?
 
     override init() {
         super.init()
+
         browser.delegate = self
         browser.browsedDeviceTypeMask = ICDeviceTypeMask.camera
-        updateStatus("idle")
-        startBrowsing() // ★
-    }
-
-    func startBrowsing() {
-        log("startBrowsing()")
-        updateStatus("browsing")
         browser.start()
+        updateStatus("")
     }
 
-    func stopBrowsing() {
-        log("stopBrowsing()")
-        browser.stop()
-        updateStatus("browse stopped")
+    private func finishPTPOperation(_ result: Bool) {
+        PTPOperation_timeout?.cancel()
+        PTPOperation_timeout = nil
+
+        let cb = PTPOperation_cb
+        PTPOperation_cb = nil
+        cb?(result)
     }
 
-    func openSession() {
-        openSession(completion: nil)
-    }
-
-    func openSession(completion: ((Bool) -> Void)?) {
+    private func openSession(_ completion: ((Bool) -> Void)?) {
         guard let camera else {
             log("openSession(): no camera")
             completion?(false)
             return
         }
 
-        if isSessionOpen {
+        if cameraStatus == "connected" {
             log("openSession(): already open")
             completion?(true)
             return
         }
 
-        pendingOpenSessionCompletion = completion
-
         camera.delegate = self
+
+        PTPOperation_timeout?.cancel()
+        PTPOperation_timeout = nil
+        PTPOperation_cb = completion  // didOpenSessionWithError
         log("requestOpenSession() -> \(camera.name ?? "unknown")")
-        updateStatus("opening session")
         camera.requestOpenSession()
     }
 
-    func closeSession() {
+    private func closeSession(_ completion: ((Bool) -> Void)?) {
         guard let camera else {
             log("closeSession(): no camera")
             return
         }
+        PTPOperation_timeout?.cancel()
+        PTPOperation_timeout = nil
+        PTPOperation_cb = completion  // didCloseSessionWithError
         log("requestCloseSession() -> \(camera.name ?? "unknown")")
         camera.requestCloseSession()
     }
@@ -89,7 +83,7 @@ final class CameraManager: NSObject {
             completion?(false, nil)
             return
         }
-        guard isSessionOpen else {
+        guard cameraStatus != "connected" else {
             log("sendCommand(): session is not open")
             completion?(false, nil)
             return
@@ -122,7 +116,6 @@ final class CameraManager: NSObject {
                 /*let parsed*/_ = try PTPParser.parseContainer(response)
                 //self.log("RECV PASS code=0x\(self.hex16(parsed.code)) params=[\(parsed.params.map { "0x" + self.hex32($0) }.joined(separator: ", "))]")
 
-                // 必要ならここで parsed.code == 0x2001 を成功判定にしてもよい
                 completion?(true, inData)
             } catch {
                 self.log("RECV PARSE ERROR: \(error)")
@@ -131,42 +124,41 @@ final class CameraManager: NSObject {
         }
     }
 
-    func connectSequence() {
+    func connectSequence(completion: ((Bool) -> Void)?) {
         log("connectSequence(): begin")
 
         openSession() { [weak self] result in
-            guard let self else { return }
-            guard result else {
-                self.log("connectSequence(): aborted at openSession")
-                return
-            }
+            guard let self, result else { completion?(false); return }
 
-            self.sendCommand(opCode: PTP_OC.OpenSession, params: [1], outData: nil) { [weak self] result, inData in
-                guard let self else { return }
-                guard result else { return }
+            self.sendCommand(opCode: PTP_OC.SDIO_Connect, params: [1,0,0], outData: nil) { [weak self] result, inData in
+                guard let self, result else { completion?(false); return }
 
-                self.sendCommand(opCode: PTP_OC.SDIO_Connect, params: [1,0,0], outData: nil) { [weak self] result, inData in
-                    guard let self else { return }
-                    guard result else { return }
+                self.sendCommand(opCode: PTP_OC.SDIO_Connect, params: [2,0,0], outData: nil) { [weak self] result, inData in
+                    guard let self, result else { completion?(false); return }
 
-                    self.sendCommand(opCode: PTP_OC.SDIO_Connect, params: [2,0,0], outData: nil) { [weak self] result, inData in
-                        guard let self else { return }
-                        guard result else { return }
+                    self.sendCommand(opCode: PTP_OC.SDIO_GetExtDeviceInfo, params: [0x012c,1], outData: nil) { [weak self] result, inData in
+                        guard let self, let inData, result else { completion?(false); return }
 
-                        self.sendCommand(opCode: PTP_OC.SDIO_GetExtDeviceInfo, params: [0x012c], outData: nil) { [weak self] result, inData in
-                            guard let self else { return }
-                            guard result else { return }
+                        let dpSize: Int = Int(PTPParser.readUInt32LE(inData, offset: 2))
+                        let ccSize: Int = Int(PTPParser.readUInt32LE(inData, offset: 2 + 4 + dpSize*2))
+                        let ccOffset: Int = 2 + 4 + dpSize*2 + 4
+                        ccList = inData.subdata(in: ccOffset ..< (ccOffset+ccSize))
 
-                            self.sendCommand(opCode: PTP_OC.SDIO_Connect, params: [3,0,0], outData: nil) { [weak self] result, inData in
-                                guard let self else { return }
-                                guard result else { return }
-                                _ = self
-                            }
+                        self.sendCommand(opCode: PTP_OC.SDIO_Connect, params: [3,0,0], outData: nil) { [weak self] result, inData in
+                            guard let self, result else { completion?(false); return }
+                            _ = self
+                            completion?(true)
+                            return
                         }
                     }
                 }
             }
         }
+    }
+
+    func disconnectSequence(completion: ((Bool) -> Void)?) {
+        log("disconnectSequence(): begin")
+        closeSession(completion)
     }
 
     func getAllDP() {
@@ -341,8 +333,8 @@ final class CameraManager: NSObject {
         return nil
     }
 
-    func setDPCC(_ pcode: UInt16, _ val: Int64) {
-		guard let param = getDPCC(pcode) else { return }
+    func setDPCC(_ pcode: UInt16, _ val: Int64) -> Bool {
+		guard let param = getDPCC(pcode) else { return false }
 
 		var outdata: Data
 	    switch param.datatype {
@@ -363,20 +355,20 @@ final class CameraManager: NSObject {
 	        outdata = withUnsafeBytes(of: v) { Data($0) }
 
 		default:
-			return
+			return false
 	    }
 
-		if !param.cc_dp {
-        	if param.modeRW != .RW { return }
+		if !param.cc_dp {	// DP
+			if param.modeRW != .RW { return false }
             sendCommand(opCode: PTP_OC.SDIO_SetExtDevicePropValue, params: [UInt32(pcode),1], outData: outdata) { result, inData in
                 guard result else { return }
         	}
-		} else {
+		} else {			// CC
             sendCommand(opCode: PTP_OC.SDIO_ControlDevice, params: [UInt32(pcode),1], outData: outdata) { result, inData in
                 guard result else { return }
         	}
 		}
-        return
+        return true
     }
 
     func setDP(_ pcode: UInt16, _ type: TypeIncDec) {
@@ -421,20 +413,51 @@ final class CameraManager: NSObject {
 		default:
 			return
 		}
-		setDPCC(pcode, val)
+		_ = setDPCC(pcode, val)
 	}
 
     func setCC(_ pcode: UInt16, _ val: Int64) {
-		setDPCC(pcode, val)
+		_ = setDPCC(pcode, val)
+	}
+
+	func listcc() {
+		log("listcc")
+        for i in 0..<ccList.count/2 {
+			let cc_enum = PTP_CC(rawValue: PTPParser.readUInt16LE(ccList, offset: i*2)) ?? .UNDEF
+			if cc_enum != PTP_CC.UNDEF {
+                log(String(format: "  %04X:", cc_enum.rawValue) + String(describing: cc_enum))
+			}
+        }
+	}
+
+	func setupCamera(_ completion: ((Bool) -> Void)?) {
+		log("setupCamera")
+    	setDP_wait(DPC.Position_Key_Setting.rawValue, 1) { result in
+			if result { self.log("  D25A:Position_Key_Setting=1(PC remote)") }
+
+	    	self.setDP_wait(DPC.Still_Image_Save_Destination.rawValue, 0x10/*camera*/) { result in
+				if result { self.log("  D222:Still_Image_Save_Destination=0x10(camera)") }
+
+		    	self.setDP_wait(DPC.USB_Power_Supply.rawValue, 1/*off*/) { result in
+					if result { self.log("  D150:USB_Power_Supply=1(off)") }
+
+					completion?(true)
+				}
+			}
+    	}
 	}
 
 	func liveview(completion: ((Bool, Data?) -> Void)?) {
-        self.sendCommand(opCode: PTP_OC.GetObject, params: [0xFFFFC002], outData: nil) { result, inData in		// liveview
+        sendCommand(opCode: PTP_OC.GetObject, params: [0xFFFFC002], outData: nil) { result, inData in		// liveview
             guard result else {
             	completion?(false, nil)
                 return
             }
             guard let inData else {
+            	completion?(false, nil)
+                return
+            }
+            if inData.count < 16 {
             	completion?(false, nil)
                 return
             }
@@ -453,6 +476,29 @@ final class CameraManager: NSObject {
     	}
         return
 	}
+
+    private func setDP_wait(_ pcode: UInt16, _ val: Int64, completion: ((Bool) -> Void)?) {
+		guard let param = getDPCC(pcode) else { completion?(false); return }
+		if val == param.current { completion?(true); return }
+
+        PTPOperation_timeout?.cancel()
+        PTPOperation_timeout = nil
+        PTPOperation_cb = completion  // didReceivePTPEvent
+
+        let timeout = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            guard self.PTPOperation_cb != nil else { return }
+
+            self.log("  setDP timeout")
+            self.finishPTPOperation(false)
+        }
+        PTPOperation_timeout = timeout
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: timeout)
+
+		let result = setDPCC(pcode, val)
+		if !result { finishPTPOperation(false); return }
+    }
 
     private func getVariableVal(_ datatype: PTP_DT, _ data: Data, _ dp: inout Int) -> Int64 {
         var val: Int64 = 0
@@ -523,6 +569,7 @@ final class CameraManager: NSObject {
     }
 
     private func updateStatus(_ text: String) {
+        cameraStatus = text
         onStatusChanged?(text)
     }
 
@@ -545,9 +592,7 @@ final class CameraManager: NSObject {
 
 extension CameraManager: ICDeviceBrowserDelegate {
 
-    func deviceBrowser(_ browser: ICDeviceBrowser,
-                       didAdd device: ICDevice,
-                       moreComing: Bool) {
+    func deviceBrowser(_ browser: ICDeviceBrowser, didAdd device: ICDevice, moreComing: Bool) {
         log("didAdd device: \(device.name ?? "unknown")")
 
         guard let cam = device as? ICCameraDevice else {
@@ -559,25 +604,21 @@ extension CameraManager: ICDeviceBrowserDelegate {
         cam.delegate = self
 
         updateCameraName(cam.name ?? "unknown")
-        updateStatus("camera found")
+        updateStatus("disconnected")
 
         log("camera assigned: \(cam.name ?? "unknown")")
 
-        // 1台見つかったら、必要に応じてここで自動 open してもよい
         if !moreComing {
             log("device enumeration completed")
         }
     }
 
-    func deviceBrowser(_ browser: ICDeviceBrowser,
-                       didRemove device: ICDevice,
-                       moreGoing: Bool) {
+    func deviceBrowser(_ browser: ICDeviceBrowser, didRemove device: ICDevice, moreGoing: Bool) {
         log("didRemove device: \(device.name ?? "unknown")")
 
         if let cam = device as? ICCameraDevice, cam == camera {
             camera = nil
-            isSessionOpen = false
-            updateCameraName("")
+            updateCameraName("(none)")
             updateStatus("camera removed")
         }
     }
@@ -590,20 +631,13 @@ extension CameraManager: ICDeviceDelegate, ICCameraDeviceDelegate {
     func device(_ device: ICDevice, didOpenSessionWithError error: (any Error)?) {
         if let error {
             log("didOpenSessionWithError: \(error.localizedDescription)")
-            isSessionOpen = false
             updateStatus("open failed")
-
-            pendingOpenSessionCompletion?(false)
-            pendingOpenSessionCompletion = nil
+            finishPTPOperation(false)
             return
         }
 
-        isSessionOpen = true
         log("session opened: \(device.name ?? "unknown")")
-        updateStatus("session open")
-
-        pendingOpenSessionCompletion?(true)
-        pendingOpenSessionCompletion = nil
+        finishPTPOperation(true)
     }
 
     func device(_ device: ICDevice, didCloseSessionWithError error: (any Error)?) {
@@ -612,9 +646,8 @@ extension CameraManager: ICDeviceDelegate, ICCameraDeviceDelegate {
         } else {
             log("session closed")
         }
-
-        isSessionOpen = false
-        updateStatus("session closed")
+        finishPTPOperation(true)
+        camera?.delegate = nil
     }
 
     func device(_ device: ICDevice, didEncounterError error: (any Error)?) {
@@ -625,7 +658,10 @@ extension CameraManager: ICDeviceDelegate, ICCameraDeviceDelegate {
     }
 
     func didRemove(_ device: ICDevice) {
-        //
+        log("removed")
+        disconnectSequence() { result in
+            return
+        }
     }
 
     func cameraDeviceDidRemoveAccessRestriction(_ device: ICDevice) {
@@ -691,6 +727,7 @@ extension CameraManager: ICDeviceDelegate, ICCameraDeviceDelegate {
             log("e-\(hex16(parsed.code)):\(String(describing: event_enum)) [\(parsed.params.map {String($0)}.joined(separator: ","))]")
             if parsed.code == PTP_SDIE.DevicePropChanged.rawValue {
                 getAllDP()
+				finishPTPOperation(true)
             }
         } catch {
             log("PTP EVENT PARSE ERROR: \(error)")

@@ -5,30 +5,29 @@ import UIKit
 
 final class CameraViewModel: ObservableObject {
 
-	@Published var isConnected = false
-	@Published var isLiveview = false
-
-    @Published var cameraName: String = ""
-    @Published var cameraStatusText: String = "idle"
+    // 1st line
+    @Published var cameraName: String = "(none)"
+    @Published var cameraStatus: String = "idle"
     @Published var jpegData: Data = Data()
 
+    // 2nd line
+	@Published var isLiveview = false
+
+    // 3rd line
     @Published var codeHex: String = "5007"
 
+    // 4th line
     @Published var dpParams: String = ""
+
+    // 5th line
     @Published var modeInput: ModeInput = .Disabled
     @Published var dpSetVal: String = "0"
 
+    // 6th line
     @Published var logText: String = ""
 
     private let manager = CameraManager()
-
-    var hasCamera: Bool {
-        manager.hasCamera
-    }
-
-    var canSendCommand: Bool {
-        manager.isSessionOpen
-    }
+    private var lvTimer: Timer?
 
     init() {
         manager.onCameraNameChanged = { [weak self] name in
@@ -39,20 +38,13 @@ final class CameraViewModel: ObservableObject {
 
         manager.onStatusChanged = { [weak self] status in
             DispatchQueue.main.async {
-                self?.cameraStatusText = status
+                self?.stopTimer()
+                self?.cameraStatus = status
             }
         }
 
         manager.onLog = { [weak self] line in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                if self.logText.isEmpty {
-                    self.logText = line
-                } else {
-                    self.logText += "\n" + line
-                }
-                print(line)
-            }
+            self?.outputLog(line)
         }
 
         manager.onDpUpdated = { [weak self] in
@@ -60,34 +52,63 @@ final class CameraViewModel: ObservableObject {
         }
     }
 
-    func startBrowse() {
-        manager.startBrowsing()
-    }
-
-    func stopBrowse() {
-        manager.stopBrowsing()
-    }
-
-    func openSession() {
-        manager.openSession()
-    }
-
     func connect() {
-        manager.connectSequence()
-		isConnected = true
+        manager.connectSequence() { result in
+			if result {
+			    DispatchQueue.main.async {
+	                self.cameraStatus = "connected"
+	                self.outputLog("connected")
+	                self.startTimer()
+			    }
+			} else {
+				self.disconnect()
+			}
+        }
     }
 
-    func closeSession() {
-        manager.closeSession()
+    func disconnect() {
+        manager.disconnectSequence() { result in
+		    DispatchQueue.main.async {
+                self.stopTimer()
+                self.cameraStatus = "disconnected"
+                self.outputLog("disconnected")
+			}
+        }
+    }
+
+    func startTimer() {
+        lvTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 20.0, repeats: true) { [weak self] _ in
+            self?.targetFunc()
+        }
+    }
+
+    func stopTimer() {
+        lvTimer?.invalidate()
+        lvTimer = nil
+    }
+
+    private func targetFunc() {
+        if isLiveview {
+			manager.liveview() { result, lvData in
+				if result {
+					guard let lvData else { return }
+			    	DispatchQueue.main.async { self.jpegData = lvData }
+				}
+				return
+			}
+		}
+    }
+
+    func toggleLiveview() {
+		isLiveview.toggle()
     }
 
 	func updateDPCC_work() -> String? {
-        var text = ""
-
         guard let pcode = UInt16(codeHex, radix: 16) else { return nil }
         guard let param = manager.getDPCC(pcode) else { return nil }
 		var _modeInput: ModeInput = .Disabled
 
+        var text = ""
         if param.cc_dp {
 	        text = String(describing: param.formflag) + "="
                 + param.enums.map {String($0)}.joined(separator: ",")
@@ -115,10 +136,10 @@ final class CameraViewModel: ObservableObject {
 
 	    if dpSetVal.hasPrefix("0x") || dpSetVal.hasPrefix("0X") {
 			guard let setVal = Int64(String(dpSetVal.dropFirst(2)), radix: 16) else {return}
-		    manager.setDPCC(pcode, setVal)
+		    _ = manager.setDPCC(pcode, setVal)
 	    } else {
 			guard let setVal = Int64(dpSetVal) else {return}
-		    manager.setDPCC(pcode, setVal)
+		    _ = manager.setDPCC(pcode, setVal)
 	    }
     }
 
@@ -132,6 +153,14 @@ final class CameraViewModel: ObservableObject {
 	    manager.setCC(pcode, val)
     }
 
+    func setCC(_ val1: Int64, _ val2: Int64) {
+        guard let pcode = UInt16(codeHex, radix: 16) else { return }
+	    manager.setCC(pcode, val1)
+		DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(30)) {
+		    self.manager.setCC(pcode, val2)
+		}
+    }
+
     func describingDPCC(_ codeStr: String) -> String {
 		guard let pcode = UInt16(codeStr, radix: 16) else { return "(unknown)" }
 
@@ -142,22 +171,23 @@ final class CameraViewModel: ObservableObject {
 		return String(describing: dp_enum)
     }
 
-    func liveview() {
-		manager.liveview() { result, lvData in
-			if result {
-				guard let lvData else { return }
-		    	DispatchQueue.main.async { self.jpegData = lvData }
-			}
-			return
-		}
-		isLiveview = true
-    }
+	func listcc() {
+		manager.listcc()
+	}
 
-    private func appendLocalLog(_ message: String) {
-        if logText.isEmpty {
-            logText = message
-        } else {
-            logText += "\n" + message
+	func setupCamera() {
+		manager.setupCamera(nil)
+	}
+
+    private func outputLog(_ line: String) {
+		//guard let self = self else { return }
+        DispatchQueue.main.async {
+            if self.logText.isEmpty {
+                self.logText = line
+            } else {
+                self.logText += "\n" + line
+            }
+            print(line)
         }
     }
 }

@@ -23,46 +23,45 @@ struct ContentView: View {
 				        VStack(alignment: .leading) {
 		                    HStack {
 								Button {
-								    vm.connect()
+								    (vm.cameraStatus == "connected") ? vm.disconnect(): vm.connect()
 								} label: {
 								    Text("connect")
 								        .foregroundColor(
-								        	!vm.hasCamera ? .gray :
-								        	vm.isConnected ? .white : .primary)
+								        	vm.cameraName == "(none)" ? .gray :
+								        	(vm.cameraStatus == "connected") ? .white : .primary)
 								        .frame(width: 80, height: 32)
 								        .background(
 								            Capsule()
-								                .fill(vm.isConnected ? Color.blue : Color(.systemBackground))
+								                .fill((vm.cameraStatus == "connected") ? Color.blue : Color(.systemBackground))
 								        )
-								}.disabled(!vm.hasCamera)
+								}.disabled(vm.cameraName == "(none)")
 
-		                        if vm.cameraName.isEmpty {
-		                        	Text("(none)")
-		                        } else {
-			                        Text(vm.cameraName + " - " + vm.cameraStatusText)
-		                        }
+		                        Text(vm.cameraName + (vm.cameraName == "(none)" ? "": " - " + vm.cameraStatus))
 							}
 
 		                    HStack {
 		                        Button {
-		                            vm.liveview()
+		                            vm.toggleLiveview()
 								} label: {
 								    Text("LiveView")
 								        .foregroundColor(
-								        	!vm.canSendCommand ? .gray :
+								        	(vm.cameraStatus != "connected") ? .gray :
 								        	vm.isLiveview ? .white : .primary)
 								        .frame(width: 80, height: 32)
 								        .background(
 								            Capsule()
-								                .fill(vm.isLiveview ? Color.blue : Color(.systemBackground))
+								                .fill((vm.cameraStatus == "connected" && vm.isLiveview) ? Color.blue : Color(.systemBackground))
 								        )
-		                        }.disabled(!vm.canSendCommand)
-
-		                        Button("listcc") {
-		                            //vm.listcc()
 		                        }
-			                    .disabled(!vm.canSendCommand)
-		                    }
+
+		                        Button("listCC") {
+		                            vm.listcc()
+		                        }
+		                        
+		                        Button("setup") {
+		                            vm.setupCamera()
+		                        }
+		                    }.disabled(vm.cameraStatus != "connected")
 						} // VStack
 					    Spacer()
 
@@ -84,9 +83,9 @@ struct ContentView: View {
 					            .onSubmit {
 			                    	vm.updateDPCC()
 					            }
-					            .onChange(of: isTextFieldFocused) { focused in
+					            .onChange(of: isTextFieldFocused) { _, focused in
 					                if !focused {
-					                    if vm.canSendCommand {
+					                    if vm.cameraStatus == "connected" {
 					                    	vm.updateDPCC()
 					                    }
 					                }
@@ -125,7 +124,7 @@ struct ContentView: View {
 			                .textFieldStyle(.roundedBorder)
 						    .lineLimit(5...20)
 					}
-					if vm.canSendCommand && (vm.modeInput != .Disabled) {
+					if (vm.cameraStatus == "connected") && (vm.modeInput != .Disabled) {
 	                    HStack {
 							if vm.modeInput == .DP {
 			                    Button("min") { vm.setDP(.Min) }
@@ -133,8 +132,9 @@ struct ContentView: View {
 			                    Button("inc") { vm.setDP(.Inc) }
 			                    Button("max") { vm.setDP(.Max) }
 							} else {
-			                    Button("set(1)") { vm.setCC(1) }
+						        Button("set(2->1)") { vm.setCC(2, 1) }
 			                    Button("set(2)") { vm.setCC(2) }
+			                    Button("set(1)") { vm.setCC(1) }
 							}
 	                        Text(" ")
 
