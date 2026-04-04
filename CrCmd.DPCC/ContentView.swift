@@ -69,10 +69,12 @@ struct ContentView: View {
 
 						if vm.cameraStatus != "connected" {
 							Button("Visit SohtaMei") {
-								if let url = URL(string: "http://sohta02.web.fc2.com/") {
+								if let url = URL(string: "http://sohta02.web.fc2.com/camera_crCmdDPCC.html") {
 								    UIApplication.shared.open(url)
 								}
 							}
+						} else if !vm.isLiveview {
+
 						} else if let uiImage = UIImage(data: vm.jpegData) {
 						    Image(uiImage: uiImage)
 						        .resizable()

@@ -16,9 +16,9 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		52F4D5602F6D48D5004F01D3 /* CrCmd.ios.sample_dp_cc */ = {
+		52F4D5602F6D48D5004F01D3 /* CrCmd.DPCC */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = CrCmd.ios.sample_dp_cc;
+			path = CrCmd.DPCC;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -38,7 +38,7 @@
 		52F4D5552F6D48D5004F01D3 = {
 			isa = PBXGroup;
 			children = (
-				52F4D5602F6D48D5004F01D3 /* CrCmd.ios.sample_dp_cc */,
+				52F4D5602F6D48D5004F01D3 /* CrCmd.DPCC */,
 				52F4D5762F6D4BB4004F01D3 /* Frameworks */,
 				52F4D55F2F6D48D5004F01D3 /* Products */,
 			);
@@ -76,7 +76,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				52F4D5602F6D48D5004F01D3 /* CrCmd.ios.sample_dp_cc */,
+				52F4D5602F6D48D5004F01D3 /* CrCmd.DPCC */,
 			);
 			name = "CrCmd DPCC";
 			packageProductDependencies = (
@@ -106,6 +106,7 @@
 			knownRegions = (
 				en,
 				Base,
+				ja,
 			);
 			mainGroup = 52F4D5552F6D48D5004F01D3;
 			minimizedProjectReferenceProxies = 1;
@@ -199,6 +200,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
 			name = Debug;
@@ -255,6 +257,7 @@
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;

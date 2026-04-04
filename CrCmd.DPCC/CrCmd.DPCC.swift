@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct CrCmd_ios_sample_dp_ccApp: App {
+struct CrCmd_DPCC: App {
     @AppStorage("eulaAccepted") private var eulaAccepted = false
 
     var body: some Scene {
