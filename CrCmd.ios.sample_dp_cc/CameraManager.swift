@@ -18,6 +18,7 @@ final class CameraManager: NSObject {
 
     private var PTPOperation_cb: ((Bool) -> Void)?
     private var PTPOperation_timeout: DispatchWorkItem?
+    private var PTPOperation_dp: DPC = .UNDEF
 
     override init() {
         super.init()
@@ -207,6 +208,14 @@ final class CameraManager: NSObject {
                 let dp_enum = DPC(rawValue: pcode) ?? .UNDEF
 
                 if dp_enum != DPC.UNDEF {
+	                if dp_enum == PTPOperation_dp {
+	                	if dp_enum != DPC.Focus_Indication {
+							finishPTPOperation(true)
+		                } else if current == 0x02 || current == 0x06 { // Focused_AF_S, Focused_AF_C
+							finishPTPOperation(true)
+						}
+					}
+
                     var updated: Bool = false
 
                     for i in 0..<dpParams.count {
@@ -225,9 +234,7 @@ final class CameraManager: NSObject {
                     }
 
                     if updated {
-                        log(String(
-                                format: "  %04X:%@=%d", Int(pcode), String(describing: dp_enum), Int(current)
-                        ))
+                        log(String(format: "  %04X:%@=%d", Int(pcode), String(describing: dp_enum), Int(current)))
                     }
 
                 	dpParams[index].modeRW = .Invalid
@@ -248,7 +255,6 @@ final class CameraManager: NSObject {
 					default:
 						break
 					}
-
 
                     dpParams[index].datatype = datatype
                     dpParams[index].current = current
@@ -432,19 +438,65 @@ final class CameraManager: NSObject {
 
 	func setupCamera(_ completion: ((Bool) -> Void)?) {
 		log("setupCamera")
-    	setDP_wait(DPC.Position_Key_Setting.rawValue, 1) { result in
-			if result { self.log("  D25A:Position_Key_Setting=1(PC remote)") }
+    	setDP_wait(DPC.Position_Key_Setting.rawValue, 1) { [weak self] result in
+			if result { self?.log("  D25A:Position_Key_Setting=1(PC remote)") }
 
-	    	self.setDP_wait(DPC.Still_Image_Save_Destination.rawValue, 0x10/*camera*/) { result in
-				if result { self.log("  D222:Still_Image_Save_Destination=0x10(camera)") }
+	    	self?.setDP_wait(DPC.Still_Image_Save_Destination.rawValue, 0x10/*camera*/) { [weak self] result in
+			if result { self?.log("  D222:Still_Image_Save_Destination=0x10(camera)") }
 
-		    	self.setDP_wait(DPC.USB_Power_Supply.rawValue, 1/*off*/) { result in
-					if result { self.log("  D150:USB_Power_Supply=1(off)") }
+		    	self?.setDP_wait(DPC.USB_Power_Supply.rawValue, 1/*off*/) { [weak self] result in
+					if result { self?.log("  D150:USB_Power_Supply=1(off)") }
 
 					completion?(true)
 				}
 			}
     	}
+	}
+
+	func capture(_ completion: ((Bool) -> Void)?) {
+		if PTPOperation_cb != nil { completion?(false); return }
+
+	    let capture_cb = { [weak self] result in	// didReceivePTPEvent
+	        guard let self else { completion?(false); return }
+			guard result else { completion?(false); return }
+
+			// 2. S2=2, S2=1, S1=1
+			guard self.setDPCC(PTP_CC.S2_Button.rawValue, 2) else { completion?(false); return }
+			DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(30)) {
+				guard self.setDPCC(PTP_CC.S2_Button.rawValue, 1) else { completion?(false); return }
+				guard self.setDPCC(PTP_CC.S1_Button.rawValue, 1) else { completion?(false); return }
+		        completion?(true)
+			}
+	    }
+
+		log("capture")
+		// 1. S1=2 (3sec timeout)
+		guard let param = getDPCC(DPC.Focus_Mode.rawValue) else { completion?(false); return }
+		if param.current == 0x0001 {	// manual focus
+			let result = setDPCC(PTP_CC.S1_Button.rawValue, 2)
+			guard result else { completion?(false); return }
+			capture_cb(true)
+		} else {
+	        PTPOperation_timeout?.cancel()
+	        PTPOperation_timeout = nil
+
+	        PTPOperation_dp = DPC.Focus_Indication
+	        PTPOperation_cb = capture_cb
+
+	        let timeout = DispatchWorkItem { [weak self] in
+	            guard let self else { completion?(false); return }
+	            guard self.PTPOperation_cb != nil else { completion?(false); return }
+
+	            self.log("  setDP timeout")
+                guard self.setDPCC(PTP_CC.S1_Button.rawValue, 1) else { completion?(false); return }
+	            self.finishPTPOperation(false)
+	        }
+
+	        PTPOperation_timeout = timeout
+	        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: timeout)
+			let result = setDPCC(PTP_CC.S1_Button.rawValue, 2)
+			guard result else { finishPTPOperation(false); return }
+		}
 	}
 
 	func liveview(completion: ((Bool, Data?) -> Void)?) {
@@ -480,14 +532,18 @@ final class CameraManager: NSObject {
     private func setDP_wait(_ pcode: UInt16, _ val: Int64, completion: ((Bool) -> Void)?) {
 		guard let param = getDPCC(pcode) else { completion?(false); return }
 		if val == param.current { completion?(true); return }
+        let dp_enum = DPC(rawValue: pcode) ?? .UNDEF
+		if PTPOperation_cb != nil { completion?(false); return }
 
+        //log(String(format: "SetDP:%04X:%@=%d", Int(pcode), String(describing: dp_enum), val))
         PTPOperation_timeout?.cancel()
         PTPOperation_timeout = nil
+        PTPOperation_dp = dp_enum
         PTPOperation_cb = completion  // didReceivePTPEvent
 
         let timeout = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            guard self.PTPOperation_cb != nil else { return }
+            guard let self else { completion?(false); return }
+            guard self.PTPOperation_cb != nil else { completion?(false); return }
 
             self.log("  setDP timeout")
             self.finishPTPOperation(false)
@@ -497,7 +553,7 @@ final class CameraManager: NSObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: timeout)
 
 		let result = setDPCC(pcode, val)
-		if !result { finishPTPOperation(false); return }
+		guard result else { finishPTPOperation(false); return }
     }
 
     private func getVariableVal(_ datatype: PTP_DT, _ data: Data, _ dp: inout Int) -> Int64 {
@@ -725,9 +781,8 @@ extension CameraManager: ICDeviceDelegate, ICCameraDeviceDelegate {
             guard let event_enum = PTP_SDIE(rawValue: parsed.code) else { return }
             //log("PTP EVENT PARSED type=0x\(hex16(parsed.type)) code=0x\(hex16(parsed.code)) txid=\(parsed.transactionID) params=[\(parsed.params.map { "0x" + hex32($0) }.joined(separator: ", "))]")
             log("e-\(hex16(parsed.code)):\(String(describing: event_enum)) [\(parsed.params.map {String($0)}.joined(separator: ","))]")
-            if parsed.code == PTP_SDIE.DevicePropChanged.rawValue {
+			if parsed.code == PTP_SDIE.DevicePropChanged.rawValue {
                 getAllDP()
-				finishPTPOperation(true)
             }
         } catch {
             log("PTP EVENT PARSE ERROR: \(error)")

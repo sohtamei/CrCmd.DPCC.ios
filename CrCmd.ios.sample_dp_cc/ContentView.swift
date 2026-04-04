@@ -10,8 +10,6 @@ struct ContentView: View {
 		"5010 (Exposure_Bias_Compensation)",
 		"D21E (ISO_Sensitivity)",
 		"500E (Exposure_Program_Mode)",
-		"D2C1 (S1_Button)",
-		"D2C2 (S2_Button)",
     ]
 
     var body: some View {
@@ -61,11 +59,21 @@ struct ContentView: View {
 		                        Button("setup") {
 		                            vm.setupCamera()
 		                        }
+
+		                        Button("capture") {
+		                            vm.capture()
+		                        }
 		                    }.disabled(vm.cameraStatus != "connected")
 						} // VStack
 					    Spacer()
 
-						if let uiImage = UIImage(data: vm.jpegData) {
+						if vm.cameraStatus != "connected" {
+							Button("Visit SohtaMei") {
+								if let url = URL(string: "http://sohta02.web.fc2.com/") {
+								    UIApplication.shared.open(url)
+								}
+							}
+						} else if let uiImage = UIImage(data: vm.jpegData) {
 						    Image(uiImage: uiImage)
 						        .resizable()
 						        .scaledToFit()

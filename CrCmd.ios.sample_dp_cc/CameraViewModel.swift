@@ -179,6 +179,10 @@ final class CameraViewModel: ObservableObject {
 		manager.setupCamera(nil)
 	}
 
+	func capture() {
+		manager.capture(nil)
+	}
+
     private func outputLog(_ line: String) {
 		//guard let self = self else { return }
         DispatchQueue.main.async {
