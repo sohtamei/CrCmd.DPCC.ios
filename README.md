@@ -1,27 +1,24 @@
 # CrCmd.DPCC.ios
 
-A test tool for Sony cameras that lets you control your camera via USB.
-
+A test tool for Sony cameras that lets you control your camera via USB.  
 This is a test tool for Sony cameras that allows you to connect a camera to your smartphone via USB and control it.
 
-![App screenshot](doc/IMG_1160s.PNG)
+<img src="doc/IMG_1160s.PNG" height="540">.  
+<a href=https://youtube.com/shorts/OTB9BZ0vInU>Link to play the demo video.</a>
 
 ## About This Tool
 
-CrCommand (Camera Remote Command) is Sony's PTP protocol for alpha cameras.
+CrCommand (Camera Remote Command) is Sony's PTP protocol for alpha cameras.  
 This app can be used as both a development tool and a sample implementation for apps built with CrCommand.
 
-The source code for this app is available on GitHub.
-Please use it as a reference and try developing your own iOS camera app.
-
-- Repository: [https://github.com/sohtamei/CrCmd.DPCC.ios](https://github.com/sohtamei/CrCmd.DPCC.ios)
+The source code for this app is available on GitHub. Please use it as a reference and try developing your own iOS/android camera app.
 
 ## Disclaimer
 
 **Using this app to control a Sony camera may void the manufacturer's warranty.**
 
-This app must not be used for critical applications such as life-support systems or for military purposes.
-These restrictions are based on the terms and conditions of Sony's library license agreement.
+This app must not be used for critical applications such as life-support systems or for military purposes.  
+These restrictions are based on the terms and conditions of Sony's library license agreement.  
 SohtaMei and Sony shall not be liable for any damage, including camera malfunction or failure, caused by the use of this app.
 
 - Sony license agreement: [https://support.d-imaging.sony.co.jp/app/cameraremotecommand/licenseagreement/index.html](https://support.d-imaging.sony.co.jp/app/cameraremotecommand/licenseagreement/index.html)
@@ -42,34 +39,30 @@ SohtaMei and Sony shall not be liable for any damage, including camera malfuncti
 - Not all cameras have been fully tested. Some models or features may not work as expected.
 - Camera connections via WLAN or Bluetooth are not supported.
 
+## download
+
+app store [https://apps.apple.com/us/app/crcmd-dpcc/id6761293168](https://apps.apple.com/us/app/crcmd-dpcc/id6761293168)
+
 ## Setup
 
 1. On the camera, set `[MENU] - [Setup] - [USB] - [USB Power Supply]` to `OFF`.
 2. Set `[MENU] - [Setup] - [USB] - [USB Connection Mode]` to `Sel. When Connect` or `Remote Shooting`.
 
-   ![USB connection mode](doc/image157.png)
+   <img src="doc/image157.png" height="250">
 
-3. Connect your smartphone to the camera using a USB or Lightning cable.
+3. Connect your smartphone to the camera using a USB or Lightning cable.  
    If your smartphone uses a Lightning connector, a **Lightning to USB Camera Adapter** is required.
 
-   ![Connection example](doc/CrCmd.DPCC.jpg)
+   <img src="doc/CrCmd.DPCC.jpg" height="200">
 
 4. Select `PC Remote` mode on the camera.
 
-   ![PC Remote mode](doc/image150.png)
+   <img src="doc/image150.png" height="250">
 
 ## Privacy Policy
 
-This app does not collect users' personal information.
+- This app does not collect users' personal information.
 
 ## Contact
 
 - X: [https://x.com/sohta02](https://x.com/sohta02)
-- GitHub: [https://github.com/sohtamei](https://github.com/sohtamei)
-- Repository: [https://github.com/sohtamei/CrCmd.DPCC.ios](https://github.com/sohtamei/CrCmd.DPCC.ios)
-- Email: sohta01@gmail.com
-
-## Source
-
-Converted from:
-[http://sohta02.web.fc2.com/camera_crCmdDPCC.html](http://sohta02.web.fc2.com/camera_crCmdDPCC.html)
